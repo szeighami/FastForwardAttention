@@ -1,6 +1,6 @@
-#include "src/fastertransformer/layers/attention_layers/DecoderSelfAttentionLayer.h" #include "src/fastertransformer/utils/logger.h"
-#include "src/fastertransformer/kernels/decoder_masked_multihead_attention.h"
-#include "src/fastertransformer/kernels/decoder_masked_multihead_attention_utils.h"
+
+#include "decoder_masked_multihead_attention.h"
+#include "decoder_masked_multihead_attention_utils.h"
 //#include "src/fastertransformer/utils/cuda_bf16_wrapper.h"
 #include <sys/time.h> // for clock_gettime()
 #include <vector> // for clock_gettime()
@@ -212,7 +212,7 @@ float half_to_float(uint16_t float16_value)
   
   return *((float*)&float32_value);
 }
-using namespace fastertransformer;
+
 
 //#define MMHA_USE_FP32_ACUM_FOR_OUT
 
@@ -1609,21 +1609,25 @@ inline bool cuda_check_error(std::string message){
     return true;
 }
 
-template<typename T, int Dh, Dh_MAX>
-void call_attention_headdim(int batch_size,int head_num, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, float softmax_scale){
+
+template<typename T, int Dh, int Dh_MAX>
+void call_attention_headdim(int seq_length, int batch_size,int head_num, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, float softmax_scale)
+{
     Masked_multihead_attention_params<T> params;
     
     memset(&params, 0, sizeof(params));
     
+    int v_vec_size=4; int k_vec_size=1; int threads_per_block=128;
+    /*
     int no_sms = 108;  float C = 3;   float gpu_clock_rate = 1215e6; int mySharedMemAllocationSize=128; int max_sharedmemory_per_block=102400; int run_time_smem=1024;
     float gpu_transfer_rate =1550*std::pow(2,30) ;
-    int v_vec_size=4; int k_vec_size=1; int threads_per_block=128;
     int precision = sizeof(T) == 4?32:16;
-    //get_launch_params(precision, params.batch_size, params.num_heads, params.hidden_size_per_head, i, no_sms, C, gpu_transfer_rate, gpu_clock_rate, mySharedMemAllocationSize, max_sharedmemory_per_block, run_time_smem, threads_per_block, v_vec_size, k_vec_size);
+    get_launch_params(precision, params.batch_size, params.num_heads, params.hidden_size_per_head, i, no_sms, C, gpu_transfer_rate, gpu_clock_rate, mySharedMemAllocationSize, max_sharedmemory_per_block, run_time_smem, threads_per_block, v_vec_size, k_vec_size);
+    */
 
-    int hidden_units = head_num * size_per_head;
+    int hidden_units = head_num * Dh;
     params.num_heads = head_num;
-    params.hidden_size_per_head = size_per_head;
+    params.hidden_size_per_head = Dh;
 
     params.q_bias = nullptr;
     params.k_bias = nullptr;
@@ -1650,34 +1654,34 @@ void call_attention_headdim(int batch_size,int head_num, T* q, T* k, T* v, T* k_
     params.v_cache = v_cache;
     params.out = out;
 
-    mmha_launch<T, Dh, Dh_MAX, KERNEL_PARAMS_TYPE>(params, stream, v_vec_size, k_vec_size, threads_per_block);
+    mmha_launch<T, Dh, Dh_MAX, Masked_multihead_attention_params<T>>(params, 0, v_vec_size, k_vec_size, threads_per_block);
 
-    if (!cuda_check_error("Attention kernel erro launch"))
-        return false;
+    cuda_check_error("Attention kernel erro launch");
 }
 
 template<typename T>
-void call_attention(int batch_size,int head_num, int size_per_head, int seq_length, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out);
+void call_attention(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out);
 
 template<>
-void call_attention<float>(int batch_size,int head_num, int size_per_head, int seq_length, float* q, float* k, float* v, float* k_cache, float* v_cache, float* out)
+void call_attention<float>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, float* q, float* k, float* v, float* k_cache, float* v_cache, float* out)
 {
     switch (size_per_head){
         case 64:
-            call_attention_headdim<uint16_t, 64, 64>(prompt_len, max_tokens, batch_size,head_num,no_layers);
+            call_attention_headdim<float, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale);
             break;
         case 80:
-            call_attention_headdim<uint16_t, 80, 128>(prompt_len, max_tokens, batch_size,head_num,no_layers);
+            call_attention_headdim<float, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale);
             break;
         case 128:
-            call_attention_headdim<uint16_t, 128, 128>(prompt_len, max_tokens, batch_size,head_num,no_layers);
+            call_attention_headdim<float, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale);
             break;
         case 256:
-            call_attention_headdim<uint16_t, 256, 256>(prompt_len, max_tokens, batch_size,head_num,no_layers);
+            call_attention_headdim<float, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale);
             break;
         default:
             printf("Not support head size\n");
             break;
+    }
 }
 
 
