@@ -108,7 +108,7 @@ struct Multihead_attention_params: public Multihead_attention_params_base<T> {
     int* memory_length_per_sample;
 
     // required in case of masked attention with different length
-    const int* length_per_sample;
+    int* length_per_sample;
 };
 
 template<typename T>
@@ -120,7 +120,7 @@ struct Multihead_attention_params<T, true>: public Multihead_attention_params_ba
     int* memory_length_per_sample;
 
     // required in case of masked attention with different length
-    const int* length_per_sample;
+    int* length_per_sample;
 };
 
 template<class T>

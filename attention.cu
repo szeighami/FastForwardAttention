@@ -978,6 +978,8 @@ __global__ void masked_multihead_attention_kernel_optimized(Multihead_attention_
     int tlength = (DO_CROSS_ATTENTION)                  ? params.memory_length_per_sample[bi] - 1 :
                   (params.length_per_sample == nullptr) ? params.timestep :
                                                           params.length_per_sample[bi];
+    if ((!DO_CROSS_ATTENTION) && (params.length_per_sample != nullptr) && (tidx == 0))
+        params.length_per_sample[bi]+=1;
 
     // First QK_VECS_PER_WARP load Q and K + the bias values for the current timestep.
     if (tidx < QK_VECS_PER_WARP) {
@@ -1611,7 +1613,7 @@ inline bool cuda_check_error(std::string message){
 
 
 template<typename T, int Dh, int Dh_MAX>
-void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, float softmax_scale, int curr_timestep)
+void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, float softmax_scale, int curr_timestep, int* seq_lengths)
 {
     Masked_multihead_attention_params<T> params;
     
@@ -1634,15 +1636,15 @@ void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* 
     params.stride = 0; //3 * hidden_units;
     params.finished = nullptr;
     params.cache_indir = nullptr;
-    params.length_per_sample = nullptr;
+    params.input_lengths = nullptr;
     params.beam_width = 1;
     params.rotary_embedding_dim = 0;
     params.inv_sqrt_dh = softmax_scale ;
     params.relative_attention_bias_stride = 0;
 
-    params.input_lengths = nullptr;
+    params.max_input_len = 0;
+    params.length_per_sample = seq_lengths;
     params.batch_size = batch_size;
-    params.max_input_len = max_seq_length;
     params.seq_length = max_seq_length;
     params.timestep = curr_timestep;
 
@@ -1662,23 +1664,23 @@ void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* 
 }
 
 template<typename T>
-void call_attention(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out);
+void call_attention(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, int* seq_lengths);
 
 template<>
-void call_attention<float>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, float* q, float* k, float* v, float* k_cache, float* v_cache, float* out)
+void call_attention<float>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, float* q, float* k, float* v, float* k_cache, float* v_cache, float* out, int* seq_lengths)
 {
     switch (size_per_head){
         case 64:
-            call_attention_headdim<float, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<float, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         case 80:
-            call_attention_headdim<float, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<float, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         case 128:
-            call_attention_headdim<float, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<float, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         case 256:
-            call_attention_headdim<float, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<float, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         default:
             printf("Not support head size\n");
@@ -1687,20 +1689,20 @@ void call_attention<float>(int batch_size,int head_num, int size_per_head, int s
 }
 
 template<>
-void call_attention<uint16_t>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, uint16_t* q, uint16_t* k, uint16_t* v, uint16_t* k_cache, uint16_t* v_cache, uint16_t* out)
+void call_attention<uint16_t>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, uint16_t* q, uint16_t* k, uint16_t* v, uint16_t* k_cache, uint16_t* v_cache, uint16_t* out, int* seq_lengths)
 {
     switch (size_per_head){
         case 64:
-            call_attention_headdim<uint16_t, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<uint16_t, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         case 80:
-            call_attention_headdim<uint16_t, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<uint16_t, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         case 128:
-            call_attention_headdim<uint16_t, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<uint16_t, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         case 256:
-            call_attention_headdim<uint16_t, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep);
+            call_attention_headdim<uint16_t, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths);
             break;
         default:
             printf("Not support head size\n");
