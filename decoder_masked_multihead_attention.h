@@ -88,9 +88,11 @@ struct Multihead_attention_params_base {
     // The 1.f / sqrt(Dh). Computed on the host.
     float inv_sqrt_dh;
 
+
     // Used when we have some input context like gpt
     const int* input_lengths;
     int max_input_len;
+    float prob_thresh; //Fraction of maximum probability to caclcuate attention with. Between 0-1
 
     const float* relative_attention_bias_float = nullptr;
     const half* relative_attention_bias_half = nullptr;
