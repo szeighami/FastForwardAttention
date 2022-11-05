@@ -18,7 +18,6 @@
 #define tpb64
 #define tpb128
 #define tpb256
-//#define tpb512
 #define tpk1
 #define tpk2
 #define tpk4
@@ -30,55 +29,6 @@
 
 
 
-float half_to_float(uint16_t float16_value)
-{
-  // MSB -> LSB
-  // float16=1bit: sign, 5bit: exponent, 10bit: fraction
-  // float32=1bit: sign, 8bit: exponent, 23bit: fraction
-  // for normal exponent(1 to 0x1e): value=2**(exponent-15)*(1.fraction)
-  // for denormalized exponent(0): value=2**-14*(0.fraction)
-  uint32_t sign = float16_value >> 15;
-  uint32_t exponent = (float16_value >> 10) & 0x1F;
-  uint32_t fraction = (float16_value & 0x3FF);
-  uint32_t float32_value;
-  if (exponent == 0)
-  {
-    if (fraction == 0)
-    {
-      // zero
-      float32_value = (sign << 31);
-    }
-    else
-    {
-      // can be represented as ordinary value in float32
-      // 2 ** -14 * 0.0101
-      // => 2 ** -16 * 1.0100
-      // int int_exponent = -14;
-      exponent = 127 - 14;
-      while ((fraction & (1 << 10)) == 0)
-      {
-        //int_exponent--;
-        exponent--;
-        fraction <<= 1;
-      }
-      fraction &= 0x3FF;
-      // int_exponent += 127;
-      float32_value = (sign << 31) | (exponent << 23) | (fraction << 13);  
-    }    
-  }
-  else if (exponent == 0x1F)
-  {
-    /* Inf or NaN */
-    float32_value = (sign << 31) | (0xFF << 23) | (fraction << 13);
-  }
-  else
-  {
-    /* ordinary number */
-    float32_value = (sign << 31) | ((exponent + (127-15)) << 23) | (fraction << 13);
-  }
-  
-  return *((float*)&float32_value);
-}
 
 
 //#define MMHA_USE_FP32_ACUM_FOR_OUT
@@ -852,11 +802,22 @@ __global__ void masked_multihead_attention_kernel_optimized(Multihead_attention_
     int qkv_base_offset = (params.stride == 0) ? bhi * Dh : bi * params.stride + hi * Dh;
 
     // int tlength = (DO_CROSS_ATTENTION)? params.memory_length_per_sample[bi] - 1 : params.timestep;
-    int tlength = (DO_CROSS_ATTENTION)                  ? params.memory_length_per_sample[bi] - 1 :
+    bool right_or_no_padding =params.right_or_no_padding;
+    int tlength;
+    int first_key;
+    if (right_or_no_padding){
+        tlength = (DO_CROSS_ATTENTION)                  ? params.memory_length_per_sample[bi] - 1 :
                   (params.length_per_sample == nullptr) ? params.timestep :
                                                           params.length_per_sample[bi];
-    if ((!DO_CROSS_ATTENTION) && (params.length_per_sample != nullptr) && (tidx == 0))
-        params.length_per_sample[bi]+=1;
+        first_key = 0;
+    }
+    else{
+        tlength =  params.timestep;
+        first_key = params.length_per_sample[bi];
+    }
+
+    //if ((!DO_CROSS_ATTENTION) && (params.length_per_sample != nullptr) && (tidx == 0))
+    //    params.length_per_sample[bi]+=1;
 
     // First QK_VECS_PER_WARP load Q and K + the bias values for the current timestep.
     if (tidx < QK_VECS_PER_WARP) {
@@ -1090,7 +1051,7 @@ __global__ void masked_multihead_attention_kernel_optimized(Multihead_attention_
         //
         // WARNING: ALL THE THREADS OF A WARP MUST ENTER!!!
         float qk = Qk_dot<T, THREADS_PER_KEY>::dot(q, k) * params.inv_sqrt_dh;
-        bool is_mask = (params.input_lengths != nullptr && ti >= params.input_lengths[bi] && ti < params.max_input_len);
+        bool is_mask = (ti < first_key) || (params.input_lengths != nullptr && ti >= params.input_lengths[bi] && ti < params.max_input_len);
 
         // Store the product to shared memory. There's one qk value per timestep. Update the max.
         // if( ti < params.timestep && tidx % THREADS_PER_KEY == 0 ) {
@@ -1148,7 +1109,7 @@ __global__ void masked_multihead_attention_kernel_optimized(Multihead_attention_
     float sum = 0.f;
     // for( int ti = tidx; ti <= params.timestep; ti += THREADS_PER_BLOCK ) {
     for (int ti = tidx; ti <= tlength; ti += THREADS_PER_BLOCK) {
-        bool is_mask = (params.input_lengths != nullptr && ti >= params.input_lengths[bi] && ti < params.max_input_len);
+        bool is_mask =(ti < first_key) || (params.input_lengths != nullptr && ti >= params.input_lengths[bi] && ti < params.max_input_len);
         float logit = is_mask ? 0.f : __expf(qk_smem[ti] - qk_max);
         sum += logit;
         qk_smem[ti] = logit;
@@ -1225,11 +1186,7 @@ __global__ void masked_multihead_attention_kernel_optimized(Multihead_attention_
     
     if (Dh == Dh_MAX || vi < Dh) {
         for (int ti = vo; ti < tlength; ti += V_PER_ITER) {
-            //if (logits_smem[ti] <= prob_thresh){
-                
             if (leq(logits_smem[ti], prob_thresh)){
-                //if (half_to_float(logits_smem[ti]) <= half_to_float(prob_thresh)){
-                //printf("continues, %f, %f, %f, %d, %d,  \n", params.prob_thresh*inv_sum, half_to_float(logits_smem[ti]), half_to_float(prob_thresh), __hle(logits_smem[ti], prob_thresh), __hle(prob_thresh, logits_smem[ti]));
                 continue;
             }
 
@@ -1479,11 +1436,6 @@ void mmha_launch(const KERNEL_PARAMS_TYPE& params, const cudaStream_t& stream, i
             mmha_launch_TPK<T, Dh, Dh_MAX, 256, KERNEL_PARAMS_TYPE>(params, stream, v_vec_size, k_vec_size);
 #endif  
             break;
-        case 512:
-#ifdef tpb512
-            mmha_launch_TPK<T, Dh, Dh_MAX, 512, KERNEL_PARAMS_TYPE>(params, stream, v_vec_size, k_vec_size);
-#endif  
-            break;
         default:
             assert(false);
     }
@@ -1500,7 +1452,7 @@ inline bool cuda_check_error(std::string message){
 
 
 template<typename T, int Dh, int Dh_MAX>
-void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, float softmax_scale, int curr_timestep, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb)
+void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, float softmax_scale, int curr_timestep, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb, bool right_or_no_padding)
 {
     Masked_multihead_attention_params<T> params;
     
@@ -1530,6 +1482,8 @@ void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* 
     params.prob_thresh = prob_thresh;
     params.relative_attention_bias_stride = 0;
 
+    params.right_or_no_padding = right_or_no_padding;
+
     params.max_input_len = 0;
     params.length_per_sample = seq_lengths;
     params.batch_size = batch_size;
@@ -1553,23 +1507,23 @@ void call_attention_headdim(int max_seq_length, int batch_size,int head_num, T* 
 }
 
 template<typename T>
-void call_attention(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb);
+void call_attention(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, T* q, T* k, T* v, T* k_cache, T* v_cache, T* out, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb, bool right_or_no_padding);
 
 template<>
-void call_attention<float>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, float* q, float* k, float* v, float* k_cache, float* v_cache, float* out, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb)
+void call_attention<float>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, float* q, float* k, float* v, float* k_cache, float* v_cache, float* out, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb, bool right_or_no_padding)
 {
     switch (size_per_head){
         case 64:
-            call_attention_headdim<float, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<float, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         case 80:
-            call_attention_headdim<float, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<float, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         case 128:
-            call_attention_headdim<float, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<float, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         case 256:
-            call_attention_headdim<float, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<float, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         default:
             printf("Not support head size\n");
@@ -1578,20 +1532,20 @@ void call_attention<float>(int batch_size,int head_num, int size_per_head, int s
 }
 
 template<>
-void call_attention<uint16_t>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, uint16_t* q, uint16_t* k, uint16_t* v, uint16_t* k_cache, uint16_t* v_cache, uint16_t* out, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb)
+void call_attention<uint16_t>(int batch_size,int head_num, int size_per_head, int seq_length, float softmax_scale, int curr_timestep, uint16_t* q, uint16_t* k, uint16_t* v, uint16_t* k_cache, uint16_t* v_cache, uint16_t* out, int* seq_lengths, float prob_thresh, int tpv, int tpk, int tpb, bool right_or_no_padding)
 {
     switch (size_per_head){
         case 64:
-            call_attention_headdim<uint16_t, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<uint16_t, 64, 64>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         case 80:
-            call_attention_headdim<uint16_t, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<uint16_t, 80, 128>(seq_length,batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         case 128:
-            call_attention_headdim<uint16_t, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<uint16_t, 128, 128>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         case 256:
-            call_attention_headdim<uint16_t, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
+            call_attention_headdim<uint16_t, 256, 256>(seq_length, batch_size,head_num, q, k, v, k_cache, v_cache, out, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb, right_or_no_padding);
             break;
         default:
             printf("Not support head size\n");

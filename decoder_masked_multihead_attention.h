@@ -93,6 +93,8 @@ struct Multihead_attention_params_base {
     const int* input_lengths;
     int max_input_len;
     float prob_thresh; //Fraction of maximum probability to caclcuate attention with. Between 0-1
+    bool update_seqlengths;
+    bool right_or_no_padding;
 
     const float* relative_attention_bias_float = nullptr;
     const half* relative_attention_bias_half = nullptr;
