@@ -184,6 +184,10 @@ struct FastForwardAttn {
         return do_attention(q, k, v, k_cache, v_cache, softmax_scale, curr_timestep, seq_lengths, prob_thresh, tpv, tpk, tpb);
     }
 
+    torch::Tensor attention(torch::Tensor q, torch::Tensor k, torch::Tensor v, float softmax_scale, int curr_timestep, float prob_thresh=0)
+    {
+        return do_attention(q, k, v, k_cache, v_cache, softmax_scale, curr_timestep, prob_thresh, tpv, tpk, tpb);
+    }
     std::pair<torch::Tensor, torch::Tensor> get_cache() { return std::make_pair(k_cache, v_cache); }
 
 
@@ -201,6 +205,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     py::class_<FastForwardAttn>(m, "FastForwardAttn")
       .def(py::init<torch::Tensor, torch::Tensor, int>())
       .def("get_cache", &FastForwardAttn::get_cache, "Get KV_cache")
+      .def("attention", py::overload_cast<torch::Tensor, torch::Tensor, torch::Tensor, float, int, float>(&FastForwardAttn::attention), "Attention forward (CUDA) fixed timesteps without kv input")
       .def("attention", py::overload_cast<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, float, int, float>(&FastForwardAttn::attention), "Attention forward (CUDA) fixed timesteps")
       .def("attention", py::overload_cast<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, float, int, torch::Tensor, float>(&FastForwardAttn::attention), "Attention forward (CUDA) varied timesteps");
 }
