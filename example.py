@@ -23,7 +23,8 @@ Q = torch.rand(batch_size, head_num, prompt_len, head_dim, dtype=dtype).cuda()
 attn = torch_attn_func(Q.view(batch_size*head_num, prompt_len, head_dim), K.view(batch_size*head_num, prompt_len, head_dim), V.view(batch_size*head_num, prompt_len, head_dim), softmax_temp)
 
 #init ffa
-ffa = FFA(K, V, prompt_len+output_len)
+total_sequence_length = prompt_len+output_len
+ffa = FFA(K, V, total_sequence_length)
 
 for i in range(output_len):
     new_token_k = torch.rand(batch_size, head_num, 1, head_dim, dtype=dtype).cuda()
