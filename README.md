@@ -27,7 +27,9 @@ ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t
 A complete example is in examply.py
 
 ### Results
-We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. Results are on RTX 3090. The modified code for using FFA with opt can be found in modeling_opt.py. The code modifies [this file](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) in the transformers library, so that it uses FFA for attention calculation. Run 
+We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. Results are on RTX 3090. We use 1000 tokens from atricle (to avoid OOM across batch sizes) and generate a 128 token summary. 
+
+The modified code for using FFA with opt can be found in modeling_opt.py. The code modifies [this file](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) in the transformers library, so that it uses FFA for attention calculation. Run 
 
 ```
 python summarize.py --max_ite 100         --hf_model_name facebook/opt-1.3b --data_type fp16 --output_len 128
