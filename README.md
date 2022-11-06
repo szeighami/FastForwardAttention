@@ -34,5 +34,11 @@ We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summar
 |FFA runtime (s) | 23.36 | 30.44 | 50.35 | 90.95 |
 |HuggingFace runtime (s) | 38.88 | 45.83 | 64.59 | 105.60 |
 
-Next, we compare the attention inference time with the orignal FasterTransformer kernel. 
+Next, we compare the attention inference time with the orignal FasterTransformer kernel. For a max token value, `x`, the models are given an input prompt with `x-128` tokens, and `128` tokens are generated iteratively, so that the final sequence length is `x`. The reported values below are the ratio between total time for ffa kernel compared with [FasterTransformer's kernel](https://github.com/NVIDIA/FasterTransformer/tree/main/src/fastertransformer/kernels). 
+
+Speedup on A100:
+![alt text](https://github.com/szeighami/FastForwardAttention/blob/main/results/A100.png)
+
+Speedup on RTX 2080 Ti:
+![alt text](https://github.com/szeighami/FastForwardAttention/blob/main/results/2080.png)
 
