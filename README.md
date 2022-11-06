@@ -27,7 +27,7 @@ ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t
 A complete example is in examply.py
 
 ### Results
-We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. 
+We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. Results are on RTX 3090.
 
 |Batch size | 10 | 5 | 2 | 1 |
 | -------- |--------| --------|  --------| --------| 
