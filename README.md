@@ -1,5 +1,5 @@
 # FastForwardAttention
-FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention implementation for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by 1.7x (see results below). It's built by performing gpu utilization optimization on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference (see results below)
+FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention implementation for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by 1.7x (see results below). It's built by performing gpu utilization optimizations on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference (see results below)
 
 ## FFA with pytorch
 ### Install
@@ -27,7 +27,7 @@ ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t
 A complete example is in examply.py
 
 ### Results
-We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. Results are on RTX 3090. We use 1000 tokens from atricle (to avoid OOM across batch sizes) and generate a 128 token summary. 
+We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. Results are on RTX 3090. We use 1,000 tokens from the atricles (to avoid OOM across batch sizes) and generate a 128 token summary. 
 
 The modified code for using FFA with opt can be found in modeling_opt.py. The code modifies [this file](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) in the transformers library, so that it uses FFA for attention calculation. Run 
 
