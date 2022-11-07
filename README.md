@@ -18,10 +18,10 @@ from ff_attention import FastForwardAttn as FFA
 ffa = FFA(K, V, prompt_len+output_len)
 ```
 
-Then, for to calculate attention between a new token at timestep t and the rest of the sequence call
+Then, to calculate attention between a new token at timestep `t` and the rest of the sequence  (with pruning threshold `p`, set `p=0` for exact attention) call 
 
 ```
-ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t, 0)
+ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t, p)
 ```
 
 A complete example is in example.py
