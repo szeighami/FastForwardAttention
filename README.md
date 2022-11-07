@@ -23,6 +23,19 @@ Then, to calculate attention between a new token at timestep `t` and the rest of
 ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t, p)
 ```
 
+`ffa_attn` is the attention output. That is, we have 
+
+```
+def torch_attn_func(Q, K, V, softmax_temp):
+    return torch.bmm(torch.nn.functional.softmax(torch.bmm(Q, K.transpose(1, 2))*softmax_temp, dim=-1), V)
+    
+K = torch.cat([K, new_token_k], axis=-2)
+V = torch.cat([V, new_token_v], axis=-2)
+torch_attn =torch_attn_func(new_token_q.view(head_num, 1, head_dim), K.view(head_num, t+1, head_dim), V.view(head_num, t+1, head_dim), softmax_temp)
+
+assert torch.abs(torch_attn-ffa_attn).max() < 1e-7
+```
+
 A complete example is in example.py
 
 ## Results
