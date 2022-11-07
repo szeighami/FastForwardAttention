@@ -1,15 +1,14 @@
 # FastForwardAttention
 FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by 1.96x (see results below) and is especially useful for long sequence generation. It's built by performing gpu utilization optimizations on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference.
 
-## FFA with pytorch
-### Install
+## Install
 Run 
 
 ```
 python setup.py install
 ```
 
-### Use
+## Use
 FFA handels iterative attention for transformer decoder. When generating tokens, the decoder only calculates attention between the current token and the rest of the sequence, which is repeated for each token. Before performing iterative attention, initialize FFA with K and V from the prompt
 
 
@@ -26,7 +25,7 @@ ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t
 
 A complete example is in example.py
 
-### Results
+## Results
 We perform [cnn_dailymail](https://huggingface.co/datasets/cnn_dailymail) summarization task with [opt-1.3b](https://huggingface.co/facebook/opt-1.3b) and compare FFA with default huggingface model. Results below are total model forward pass time for performing summarization for 100 test samples from cnn_dailymail dataset. Results are on RTX 3090. We use 1,000 tokens from the atricles (to avoid OOM across batch sizes) and generate a 256 and 128 token summary. 
 
 The modified code for using FFA with opt can be found in modeling_opt.py. The code modifies [this file](https://github.com/huggingface/transformers/blob/main/src/transformers/models/opt/modeling_opt.py) in the transformers library, so that it uses FFA for attention calculation. Run 
