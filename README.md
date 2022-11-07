@@ -1,5 +1,5 @@
 # FastForwardAttention
-FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by upto 2.1x (see results below) and is especially useful for long sequence generation. It's built by performing gpu utilization optimizations on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference (see results below)
+FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by upto 2.1x (see results below) and is especially useful for long sequence generation. It's built by performing gpu utilization optimizations on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference.
 
 ## FFA with pytorch
 ### Install
