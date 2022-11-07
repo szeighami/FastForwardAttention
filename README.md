@@ -1,5 +1,5 @@
 # FastForwardAttention
-FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by upto 2.1x (see results below) and is especially useful for long sequence generation. It's built by performing gpu utilization optimizations on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference.
+FastForwardAttention (FFA) is a pytorch extention for efficient exact iterative attention for natural language generation. It can easily replace iterative attention in huggingface models and improve throughput by 1.96x (see results below) and is especially useful for long sequence generation. It's built by performing gpu utilization optimizations on top of [FasterTransformer](https://github.com/NVIDIA/FasterTransformer)'s implementation for faster inference.
 
 ## FFA with pytorch
 ### Install
@@ -36,10 +36,10 @@ python summarize.py --max_ite 100  --hf_model_name facebook/opt-1.3b --data_type
 ```
 to obtain the following results
 
-|Batch size | 15  | 10 | 5 | 2 | 1 |
-| -------- |--------|--------| --------|  --------| --------| 
-|FFA + HuggingFace runtime (s) | 26.93| 34.88 | 48.99 |  88.65 | 160.64 |
-|Default HuggingFace runtime (s) | 55.44| 68.46 | 82.57 | 119.34 | 194.98 |
+|Batch size | 10 | 5 | 2 | 1 |
+| -------- |--------| --------|  --------| --------| 
+|FFA + HuggingFace runtime (s) | 34.88 | 48.99 |  88.65 | 160.64 |
+|Default HuggingFace runtime (s) | 68.46 | 82.57 | 119.34 | 194.98 |
 
 and 
 ```
@@ -47,10 +47,10 @@ python summarize.py --max_ite 100  --hf_model_name facebook/opt-1.3b --data_type
 ```
 to obtain
 
-|Batch size | 15  | 10 | 5 | 2 | 1 |
-| -------- |--------|--------| --------|  --------| --------| 
-|FFA + HuggingFace runtime (s) | 18.55| 23.36 | 30.44 | 50.35 | 90.95 |
-|Default HuggingFace runtime (s) | 31.95| 38.88 | 45.83 | 64.59 | 105.60 |
+|Batch size | 10 | 5 | 2 | 1 |
+| -------- |--------| --------|  --------| --------| 
+|FFA + HuggingFace runtime (s)| 23.36 | 30.44 | 50.35 | 90.95 |
+|Default HuggingFace runtime (s) | 38.88 | 45.83 | 64.59 | 105.60 |
 
 Next, we compare the attention inference time with the orignal FasterTransformer kernel. For a max token value, `x`, the models are given an input prompt with `x-128` tokens, and `128` tokens are generated iteratively, so that the final sequence length is `x`. The reported values below are the ratio between total time for ffa kernel compared with [FasterTransformer's kernel](https://github.com/NVIDIA/FasterTransformer/tree/main/src/fastertransformer/kernels). 
 
