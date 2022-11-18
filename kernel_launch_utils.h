@@ -132,8 +132,29 @@ float get_time_for_param(int precision, int batch_size, int head_num, int head_s
 }
 
 
-void get_launch_params(int precision, int batch_size, int head_num, int head_size, int prompt_len, int& tpb, int& tpv, int& tpk)
+void get_launch_params(int precision, int batch_size, int head_num, int head_size, int prompt_len, int& tpb, int& tpv, int& tpk, bool use_default_ft=false)
 {
+    if (use_default_ft) {
+        if (precision == 32)
+            tpv = 4;
+        else
+            tpv = 8;
+
+
+        if (prompt_len < 32){
+            tpb = 64; tpk=4;
+        }
+        else if (prompt_len < 2048){
+            tpb = 128; tpk=2;
+        }
+        else{
+            tpb = 256; tpk=1; 
+        }
+        return;
+    }
+
+
+       
 	std::vector<int> tpks = {1, 2, 4};
 	std::vector<int> tpbs = {64, 128, 256};
 	std::vector<int> tpvs = {2, 4};

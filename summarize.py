@@ -84,8 +84,16 @@ def main():
         shuffled = np.random.permutation(11490)
         index = shuffled[:(args.max_ite//batch_size)*batch_size].reshape(-1, batch_size)
             
-        for use_ffa in [9, 1]:
-            os.environ["use_ffa"] = str(use_ffa) 
+        for use_ffa in [0, 1, 2]:
+            if use_ffa == 1:
+                os.environ["use_ffa"] = str(use_ffa) 
+                os.environ["use_ffa_default_kl"] = str(0) 
+            elif use_ffa == 2:
+                os.environ["use_ffa"] = str(use_ffa) 
+                os.environ["use_ffa_default_kl"] = str(1) 
+            else:
+                os.environ["use_ffa"] = str(0) 
+                os.environ["use_ffa_default_kl"] = str(0) 
 
             metric = load_metric("rouge")
 
@@ -114,20 +122,20 @@ def main():
                 seq_lens = seq_lens.int()
                 inputs = inputs.int()
 
-                try:
-                    start_time = datetime.now()
-                    outputs = summarize_hf(inputs, mask, model)
+                #try:
+                start_time = datetime.now()
+                outputs = summarize_hf(inputs, mask, model)
 
-                    stop_time = datetime.now()
-                    curr_time += (stop_time - start_time).total_seconds()
-                        
-                    batch_out_sentence = tokenizer.batch_decode(outputs.reshape(batch_size, -1), skip_special_tokens=True)
-                    summary = [s.split(" TL;DR:")[1] for s in batch_out_sentence]
+                stop_time = datetime.now()
+                curr_time += (stop_time - start_time).total_seconds()
+                    
+                batch_out_sentence = tokenizer.batch_decode(outputs.reshape(batch_size, -1), skip_special_tokens=True)
+                summary = [s.split(" TL;DR:")[1] for s in batch_out_sentence]
 
 
-                    metric.add_batch(predictions=summary, references=datapoints['highlights'])
-                except:
-                    print('Error with datapoint : ', i)
+                metric.add_batch(predictions=summary, references=datapoints['highlights'])
+                #except:
+                #    print('Error with datapoint : ', i)
 
             computed_metrics = metric.compute()
             print(f'use_ffa={use_ffa}, batch_size={batch_size} total latency: {curr_time} sec')
