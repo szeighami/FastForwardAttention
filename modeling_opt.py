@@ -194,6 +194,7 @@ class OPTAttention(nn.Module):
             value_states = self.v_proj(hidden_states)
 
         use_ff_attention = int(os.environ["use_ffa"]) == 1
+        use_ff_attention_default = int(os.environ["use_ffa_default_kl"]) == 1
         if use_ff_attention:
             max_tokens = int(os.environ["max_tokens"])
 
@@ -218,7 +219,7 @@ class OPTAttention(nn.Module):
                 prompt_seqlen = key_states.shape[-2]
                 max_seqlen = prompt_seqlen+max_tokens
 
-                ffa_cache = ffa(key_states.view(bsz, self.num_heads, -1, self.head_dim), value_states.view(bsz, self.num_heads, -1, self.head_dim), max_seqlen)
+                ffa_cache = ffa(key_states.view(bsz, self.num_heads, -1, self.head_dim), value_states.view(bsz, self.num_heads, -1, self.head_dim), max_seqlen, use_ff_attention_default)
                 k_cache, v_cache = ffa_cache.get_cache()
 
                 seq_lens = torch.max(attention_mask[:, :, -1, :], dim=-1).indices
