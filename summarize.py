@@ -84,12 +84,12 @@ def main():
         shuffled = np.random.permutation(11490)
         index = shuffled[:(args.max_ite//batch_size)*batch_size].reshape(-1, batch_size)
             
-        for use_ffa in [0, 1, 2]:
+        for use_ffa in [2]:
             if use_ffa == 1:
                 os.environ["use_ffa"] = str(use_ffa) 
                 os.environ["use_ffa_default_kl"] = str(0) 
             elif use_ffa == 2:
-                os.environ["use_ffa"] = str(use_ffa) 
+                os.environ["use_ffa"] = str(1) 
                 os.environ["use_ffa_default_kl"] = str(1) 
             else:
                 os.environ["use_ffa"] = str(0) 
