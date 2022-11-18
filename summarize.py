@@ -84,7 +84,7 @@ def main():
         shuffled = np.random.permutation(11490)
         index = shuffled[:(args.max_ite//batch_size)*batch_size].reshape(-1, batch_size)
             
-        for use_ffa in [9, 1]:
+        for use_ffa in [0, 1]:
             os.environ["use_ffa"] = str(use_ffa) 
 
             metric = load_metric("rouge")
