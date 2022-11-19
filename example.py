@@ -24,7 +24,8 @@ attn = torch_attn_func(Q.view(batch_size*head_num, prompt_len, head_dim), K.view
 
 #init ffa
 total_sequence_length = prompt_len+output_len
-ffa = FFA(K, V, total_sequence_length)
+default_kernel_launch = False #True to use FasterTransformer's default kernel lanch. False to use optimized kernel launch
+ffa = FFA(K, V, total_sequence_length, default_kernel_launch)
 
 for i in range(output_len):
     new_token_k = torch.rand(batch_size, head_num, 1, head_dim, dtype=dtype).cuda()
