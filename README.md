@@ -14,10 +14,10 @@ FFA handels iterative attention for transformer decoder. When generating tokens,
 
 ```
 from ff_attention import FastForwardAttn as FFA
-ffa = FFA(K, V, prompt_len+output_len)
+ffa = FFA(K, V, prompt_len+output_len, use_default_kernel_launch)
 ```
 
-Then, to calculate attention between a new token at timestep `t` and the rest of the sequence  (with pruning threshold `p`, set `p=0` for exact attention) call 
+Where set `use_default_kernel_launch=True` to use FasterTransformer's default kernel launch or `use_default_kernel_launch=False` to use optimized kernel launch. Then, to calculate attention between a new token at timestep `t` and the rest of the sequence  (with pruning threshold `p`, set `p=0` for exact attention) call 
 
 ```
 ffa_attn = ffa.attention(new_token_q, new_token_k, new_token_v, softmax_scale, t, p)
