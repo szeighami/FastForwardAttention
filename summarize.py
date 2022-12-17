@@ -79,12 +79,12 @@ def main():
     os.environ["max_tokens"] = str(output_len)
     os.environ["use_ffa"] = "1"
 
-    for batch_size in [10, 5, 2, 1]:
+    for batch_size in [1, 2, 5, 10]:
         np.random.seed(0)
         shuffled = np.random.permutation(11490)
         index = shuffled[:(args.max_ite//batch_size)*batch_size].reshape(-1, batch_size)
             
-        for use_ffa in [2]:
+        for use_ffa in [0, 1, 2]:
             if use_ffa == 1:
                 os.environ["use_ffa"] = str(use_ffa) 
                 os.environ["use_ffa_default_kl"] = str(0) 
